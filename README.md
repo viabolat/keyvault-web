@@ -66,6 +66,9 @@ Supabase (`supabase/migrations/`, RLS: users can read and write only their own r
 
 ## Deploy (Vercel)
 
+Pushing to `main` on GitHub (`viabolat/keyvault-web`) deploys to production automatically; other branches get preview
+URLs. `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set in the Vercel project. Manual deploy from this machine:
+
 ```bash
 set -a; . ./.env.local; set +a
 npx vercel deploy --prod --yes --build-env VITE_SUPABASE_URL="$VITE_SUPABASE_URL" --build-env VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY"
