@@ -16,8 +16,9 @@ const AUTO_LOCK_MS = 10 * 60 * 1000;
 const CLIPBOARD_CLEAR_MS = 90 * 1000;
 const VAULT_COLORS = ['#1a8cff', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
 
-export function Unlocked({ session, cloud, connecting, onLock, onSignOut }: {
+export function Unlocked({ session, cloud, connecting, onLock, onSignOut, onShowKit }: {
   session: Session; cloud: CloudBackend | null; connecting: Promise<ConnectResult> | null; onLock: () => void; onSignOut: () => void;
+  onShowKit?: () => void;
 }) {
   const [, rerender] = useState(0);
   const refresh = () => rerender((n) => n + 1);
@@ -117,7 +118,7 @@ export function Unlocked({ session, cloud, connecting, onLock, onSignOut }: {
         </div>
         <button className="btn" onClick={() => setModal('generator')}><Icon.dice size={16} /><span className="hide-sm"> Generate</span></button>
         <SyncBadge status={syncStatus} />
-        <AccountMenu session={session} onLock={onLock} onSignOut={onSignOut} onImport={() => setModal('import')} />
+        <AccountMenu session={session} onLock={onLock} onSignOut={onSignOut} onImport={() => setModal('import')} onShowKit={onShowKit} />
       </header>
 
       <nav className={`sidebar ${navOpen ? 'open' : ''}`} aria-label="Vaults and categories">
@@ -250,7 +251,9 @@ function NavRow(p: { active: boolean; onClick: () => void; icon: React.ReactNode
   );
 }
 
-function AccountMenu({ session, onLock, onSignOut, onImport }: { session: Session; onLock: () => void; onSignOut: () => void; onImport: () => void }) {
+function AccountMenu({ session, onLock, onSignOut, onImport, onShowKit }: {
+  session: Session; onLock: () => void; onSignOut: () => void; onImport: () => void; onShowKit?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="account-menu">
@@ -261,6 +264,7 @@ function AccountMenu({ session, onLock, onSignOut, onImport }: { session: Sessio
         <div className="menu" role="menu" onMouseLeave={() => setOpen(false)}>
           <div className="menu-id"><strong>{session.name}</strong><span className="muted">{session.email}</span></div>
           <button role="menuitem" onClick={onLock}><Icon.lock size={16} /> Lock <kbd>Ctrl ⇧ L</kbd></button>
+          {onShowKit && <button role="menuitem" onClick={() => { setOpen(false); onShowKit(); }}>Emergency Kit…</button>}
           <button role="menuitem" onClick={() => { setOpen(false); onImport(); }}>Import from 1Password…</button>
           <button role="menuitem" onClick={onSignOut}>Sign out of this device</button>
         </div>

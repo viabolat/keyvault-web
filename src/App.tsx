@@ -10,7 +10,7 @@ export default function App() {
   const cloud = useMemo(() => cloudFromEnv(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [sync, setSync] = useState<Promise<ConnectResult> | null>(null);
-  const [kit, setKit] = useState<string | null>(null);
+  const [kit, setKit] = useState<{ secretKey: string; reprint: boolean } | null>(null);
   // reason: remount AuthScreen after lock/sign-out so it re-reads known devices.
   const [authKey, setAuthKey] = useState(0);
 
@@ -24,8 +24,11 @@ export default function App() {
 
   if (!session) {
     return <AuthScreen key={authKey} store={store} cloud={cloud}
-      onSession={(s, sk, connecting) => { setSession(s); setKit(sk ?? null); setSync(connecting ?? null); }} />;
+      onSession={(s, sk, connecting) => { setSession(s); setKit(sk ? { secretKey: sk, reprint: false } : null); setSync(connecting ?? null); }} />;
   }
-  if (kit) return <EmergencyKit session={session} secretKey={kit} onDone={() => setKit(null)} />;
-  return <Unlocked session={session} cloud={cloud} connecting={sync} onLock={lock} onSignOut={signOut} />;
+  if (kit) return <EmergencyKit session={session} secretKey={kit.secretKey} reprint={kit.reprint} onDone={() => setKit(null)} />;
+  // Only trusted devices keep the Secret Key; public/shared sign-ins have nothing to show.
+  const deviceKey = store.knownDevices().find((d) => d.accountId === session.accountId)?.secretKey;
+  return <Unlocked session={session} cloud={cloud} connecting={sync} onLock={lock} onSignOut={signOut}
+    onShowKit={deviceKey ? () => setKit({ secretKey: deviceKey, reprint: true }) : undefined} />;
 }

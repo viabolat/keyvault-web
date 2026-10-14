@@ -33,7 +33,7 @@ the publicly documented security design. They are not taken from captured code.
 
 ## Features
 
-Sign-up with an Emergency Kit (download or copy), sign-in and unlock, multiple vaults (create, rename, recolor, delete),
+Sign-up with an Emergency Kit (download or copy; reopen it any time from the account menu on a trusted device), sign-in and unlock, multiple vaults (create, rename, recolor, delete),
 six item categories, custom fields, TOTP with a countdown, a password generator (random, memorable, PIN), password history,
 favorites, tags, search (`/`), trash, Watchtower (weak passwords, reused passwords, missing 2FA), auto-lock after 10 minutes
 (or Ctrl+Shift+L), clipboard auto-clear after 90 seconds, dark mode, and a mobile layout.

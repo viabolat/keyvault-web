@@ -197,7 +197,7 @@ export function StrengthMeter({ value }: { value: string }) {
   );
 }
 
-export function EmergencyKit({ session, secretKey, onDone }: { session: Session; secretKey: string; onDone: () => void }) {
+export function EmergencyKit({ session, secretKey, onDone, reprint = false }: { session: Session; secretKey: string; onDone: () => void; reprint?: boolean }) {
   const [ack, setAck] = useState(false);
   const download = () => {
     const text = [
@@ -223,8 +223,10 @@ export function EmergencyKit({ session, secretKey, onDone }: { session: Session;
     <div className="kit-screen">
       <div className="kit">
         <Logo size={48} />
-        <h1>Save your Emergency Kit</h1>
-        <p>This is the only time your Secret Key is shown in full. You need it, together with your password, to sign in on any new device.</p>
+        <h1>{reprint ? 'Your Emergency Kit' : 'Save your Emergency Kit'}</h1>
+        <p>{reprint
+          ? 'Your Secret Key, together with your password, signs you in on any new device. Store this kit away from your password.'
+          : 'Save this now. Your Secret Key and password together sign you in on any new device. You can show this kit again later from the account menu on this device.'}</p>
         <dl>
           <dt>Email</dt><dd>{session.email}</dd>
           <dt>Secret Key</dt><dd className="mono secret-key">{secretKey}</dd>
@@ -233,11 +235,13 @@ export function EmergencyKit({ session, secretKey, onDone }: { session: Session;
           <button className="btn" onClick={() => navigator.clipboard.writeText(secretKey)}>Copy Secret Key</button>
           <button className="btn" onClick={download}>Download Emergency Kit</button>
         </div>
-        <label className="check">
-          <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-          I've saved my Emergency Kit somewhere safe
-        </label>
-        <button className="btn primary" disabled={!ack} onClick={onDone}>Open my vault</button>
+        {!reprint && (
+          <label className="check">
+            <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+            I've saved my Emergency Kit somewhere safe
+          </label>
+        )}
+        <button className="btn primary" disabled={!reprint && !ack} onClick={onDone}>{reprint ? 'Back to my vault' : 'Open my vault'}</button>
       </div>
     </div>
   );
