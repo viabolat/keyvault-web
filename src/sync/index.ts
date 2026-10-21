@@ -49,6 +49,21 @@ export async function connect(cloud: CloudBackend, s: Required<Pick<Secrets, 'em
   }
 }
 
+/**
+ * Biometric unlock has no password to derive the login secret from, so reuse the server session
+ * the sync client keeps from the last password unlock.
+ */
+export async function resumeSync(cloud: CloudBackend, email: string): Promise<ConnectResult> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'offline';
+  try {
+    if ((await cloud.currentEmail()) === email.trim().toLowerCase()) return 'ok';
+  } catch (err) {
+    if (isNetworkError(err)) return 'offline';
+    throw err;
+  }
+  throw new Error('Sync paused. Lock, then unlock once with your password to resume.');
+}
+
 export async function signUpAnywhere(
   store: AccountStore,
   cloud: CloudBackend | null,

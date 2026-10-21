@@ -67,8 +67,20 @@ interface DeviceRecord {
   secretKey?: string; // absent when signed in on a public/shared computer
 }
 
+/** Face ID / biometric unlock for one account on this device. Never synced. */
+export interface BiometricRecord {
+  accountId: string;
+  credentialId: string; // base64 WebAuthn credential id
+  salt: string; // base64 PRF input
+  wrapped: Envelope; // account key wrapped by a key derived from the PRF output
+  confirmedAt: number; // last password unlock; biometric unlock expires after BIOMETRIC_MAX_AGE_MS
+}
+
+export const BIOMETRIC_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
 const ACCOUNT_PREFIX = 'keyvault:account:';
 const DEVICE_KEY = 'keyvault:device';
+const BIOMETRIC_PREFIX = 'keyvault:biometric:';
 
 type Overview = Pick<Item, 'title' | 'urls' | 'tags' | 'category' | 'favorite' | 'trashed'>;
 type Details = Pick<Item, 'fields' | 'notes' | 'passwordHistory'>;
@@ -97,6 +109,30 @@ export class AccountStore {
 
   forgetDevice(accountId: string) {
     this.kv.setItem(DEVICE_KEY, JSON.stringify(this.knownDevices().filter((d) => d.accountId !== accountId)));
+    this.removeBiometric(accountId);
+  }
+
+  biometric(accountId: string): BiometricRecord | undefined {
+    try {
+      const raw = this.kv.getItem(BIOMETRIC_PREFIX + accountId);
+      return raw ? (JSON.parse(raw) as BiometricRecord) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** A record that exists but is past its password re-check date is treated as unusable, not deleted. */
+  biometricUsable(accountId: string, now = Date.now()): boolean {
+    const rec = this.biometric(accountId);
+    return !!rec && now - rec.confirmedAt < BIOMETRIC_MAX_AGE_MS;
+  }
+
+  saveBiometric(rec: BiometricRecord) {
+    this.kv.setItem(BIOMETRIC_PREFIX + rec.accountId, JSON.stringify(rec));
+  }
+
+  removeBiometric(accountId: string) {
+    this.kv.removeItem(BIOMETRIC_PREFIX + accountId);
   }
 
   findAccount(email: string): StoredAccount | undefined {
@@ -177,6 +213,23 @@ export class AccountStore {
       email: acct.email,
       secretKey: input.publicComputer ? undefined : secretKey,
     });
+    // reason: a public/shared sign-in must not leave a biometric shortcut from an earlier trusted session.
+    if (input.publicComputer) this.removeBiometric(acct.accountId);
+    else {
+      const bio = this.biometric(acct.accountId);
+      if (bio) this.saveBiometric({ ...bio, confirmedAt: Date.now() });
+    }
+    return this.open(acct, accountKey);
+  }
+
+  /** Unlock with an account key recovered by biometric unlock (no password involved). */
+  async unlockWithAccountKey(accountId: string, accountKey: CryptoKey) {
+    const raw = this.kv.getItem(ACCOUNT_PREFIX + accountId);
+    if (!raw) throw new Error('No account with that id on this device');
+    return this.open(JSON.parse(raw) as StoredAccount, accountKey);
+  }
+
+  private async open(acct: StoredAccount, accountKey: CryptoKey) {
     const { name } = await decryptJson<{ name: string }>(accountKey, acct.profile);
     const vaultKeys = new Map<string, CryptoKey>();
     for (const v of acct.vaults) vaultKeys.set(v.id, await unwrapKey(accountKey, v.key));
@@ -197,7 +250,7 @@ export class AccountStore {
 
   deleteAccount(accountId: string) {
     this.kv.removeItem(ACCOUNT_PREFIX + accountId);
-    this.forgetDevice(accountId);
+    this.forgetDevice(accountId); // also drops the biometric record
   }
 }
 
@@ -368,6 +421,11 @@ export class Session {
     const sv = this.acct.vaults.find((v) => v.id === id);
     if (!sv) throw new Error('Unknown vault');
     return sv;
+  }
+
+  /** Wrap the account key for biometric unlock. The raw key never leaves this method. */
+  wrapAccountKey(wrapping: CryptoKey): Promise<Envelope> {
+    return wrapKey(wrapping, this.accountKey);
   }
 
   /** Encrypted account as stored; safe to upload. */

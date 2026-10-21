@@ -30,5 +30,6 @@ export default function App() {
   // Only trusted devices keep the Secret Key; public/shared sign-ins have nothing to show.
   const deviceKey = store.knownDevices().find((d) => d.accountId === session.accountId)?.secretKey;
   return <Unlocked session={session} cloud={cloud} connecting={sync} onLock={lock} onSignOut={signOut}
-    onShowKit={deviceKey ? () => setKit({ secretKey: deviceKey, reprint: true }) : undefined} />;
+    onShowKit={deviceKey ? () => setKit({ secretKey: deviceKey, reprint: true }) : undefined}
+    biometricStore={deviceKey ? store : undefined} />;
 }

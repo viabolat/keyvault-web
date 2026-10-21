@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Session } from '../store/account';
+import type { AccountStore, Session } from '../store/account';
+import { biometricAvailable, biometricLabel, enableBiometric } from '../crypto/biometric';
 import { CATEGORY_LABEL, itemSubtitle, primaryPassword, type Category, type Item, type Vault } from '../types';
 import { CategoryGlyph, CategoryIcon, Icon, Logo } from './icons';
 import { Generator, ItemDetail, ItemEditor } from './Item';
@@ -16,9 +17,9 @@ const AUTO_LOCK_MS = 10 * 60 * 1000;
 const CLIPBOARD_CLEAR_MS = 90 * 1000;
 const VAULT_COLORS = ['#1a8cff', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b'];
 
-export function Unlocked({ session, cloud, connecting, onLock, onSignOut, onShowKit }: {
+export function Unlocked({ session, cloud, connecting, onLock, onSignOut, onShowKit, biometricStore }: {
   session: Session; cloud: CloudBackend | null; connecting: Promise<ConnectResult> | null; onLock: () => void; onSignOut: () => void;
-  onShowKit?: () => void;
+  onShowKit?: () => void; biometricStore?: AccountStore;
 }) {
   const [, rerender] = useState(0);
   const refresh = () => rerender((n) => n + 1);
@@ -118,7 +119,7 @@ export function Unlocked({ session, cloud, connecting, onLock, onSignOut, onShow
         </div>
         <button className="btn" onClick={() => setModal('generator')}><Icon.dice size={16} /><span className="hide-sm"> Generate</span></button>
         <SyncBadge status={syncStatus} />
-        <AccountMenu session={session} onLock={onLock} onSignOut={onSignOut} onImport={() => setModal('import')} onShowKit={onShowKit} />
+        <AccountMenu session={session} onLock={onLock} onSignOut={onSignOut} onImport={() => setModal('import')} onShowKit={onShowKit} biometricStore={biometricStore} />
       </header>
 
       <nav className={`sidebar ${navOpen ? 'open' : ''}`} aria-label="Vaults and categories">
@@ -251,10 +252,12 @@ function NavRow(p: { active: boolean; onClick: () => void; icon: React.ReactNode
   );
 }
 
-function AccountMenu({ session, onLock, onSignOut, onImport, onShowKit }: {
+function AccountMenu({ session, onLock, onSignOut, onImport, onShowKit, biometricStore }: {
   session: Session; onLock: () => void; onSignOut: () => void; onImport: () => void; onShowKit?: () => void;
+  biometricStore?: AccountStore;
 }) {
   const [open, setOpen] = useState(false);
+  const bio = useBiometricToggle(session, biometricStore);
   return (
     <div className="account-menu">
       <button className="avatar-btn" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Account">
@@ -265,12 +268,47 @@ function AccountMenu({ session, onLock, onSignOut, onImport, onShowKit }: {
           <div className="menu-id"><strong>{session.name}</strong><span className="muted">{session.email}</span></div>
           <button role="menuitem" onClick={onLock}><Icon.lock size={16} /> Lock <kbd>Ctrl ⇧ L</kbd></button>
           {onShowKit && <button role="menuitem" onClick={() => { setOpen(false); onShowKit(); }}>Emergency Kit…</button>}
+          {bio.available && (
+            <button role="menuitem" onClick={bio.toggle} disabled={bio.busy}>
+              {bio.enabled ? `Turn off ${bio.label}` : `Turn on ${bio.label}…`}
+            </button>
+          )}
+          {bio.error && <p className="error menu-note" role="alert">{bio.error}</p>}
           <button role="menuitem" onClick={() => { setOpen(false); onImport(); }}>Import from 1Password…</button>
           <button role="menuitem" onClick={onSignOut}>Sign out of this device</button>
         </div>
       )}
     </div>
   );
+}
+
+/** Only offered on trusted devices (biometricStore is undefined on public/shared sign-ins). */
+function useBiometricToggle(session: Session, store?: AccountStore) {
+  const [available, setAvailable] = useState(false);
+  const [enabled, setEnabled] = useState(() => !!store?.biometric(session.accountId));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (store) void biometricAvailable().then(setAvailable);
+  }, [store]);
+  const toggle = async () => {
+    if (!store) return;
+    setError('');
+    if (enabled) {
+      store.removeBiometric(session.accountId);
+      return setEnabled(false);
+    }
+    setBusy(true);
+    try {
+      await enableBiometric(store, session);
+      setEnabled(true);
+    } catch (err) {
+      if ((err as Error).name !== 'NotAllowedError') setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { available, enabled, busy, error, toggle, label: biometricLabel() };
 }
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {

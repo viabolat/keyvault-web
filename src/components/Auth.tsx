@@ -7,7 +7,8 @@ import { AccountStore, Session } from '../store/account';
 import { Logo } from './icons';
 import { strength } from '../crypto/generator';
 import type { CloudBackend } from '../sync/cloud';
-import { signUpAnywhere, unlockAnywhere, type ConnectResult } from '../sync';
+import { resumeSync, signUpAnywhere, unlockAnywhere, type ConnectResult } from '../sync';
+import { biometricLabel, unlockWithBiometric } from '../crypto/biometric';
 
 type Mode = 'email' | 'unlock' | 'signup';
 export type OnSession = (s: Session, kit?: string, sync?: Promise<ConnectResult> | null) => void;
@@ -101,6 +102,24 @@ function UnlockForm(props: {
   const [secretKey, setSecretKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const accountId = props.known ? props.store.findAccount(props.email)?.accountId : undefined;
+  const bio = accountId ? props.store.biometric(accountId) : undefined;
+  const bioReady = !!accountId && props.store.biometricUsable(accountId);
+  const label = biometricLabel();
+  const unlockBio = async () => {
+    if (!accountId) return;
+    setBusy(true);
+    setError('');
+    try {
+      const session = await unlockWithBiometric(props.store, accountId);
+      props.onSession(session, undefined, props.cloud ? resumeSync(props.cloud, session.email) : null);
+    } catch (err) {
+      // reason: dismissing the Face ID sheet throws NotAllowedError; that's a cancel, not a failure.
+      if ((err as Error).name !== 'NotAllowedError') setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <form
       onSubmit={async (e) => {
@@ -135,6 +154,8 @@ function UnlockForm(props: {
         onChange={(e) => setPassword(e.target.value)} required />
       {error && <p className="error" role="alert">{error}</p>}
       <button className="btn primary" type="submit" disabled={busy}>{busy ? 'Unlocking…' : props.known ? 'Unlock' : 'Sign in'}</button>
+      {bioReady && <button className="btn" type="button" onClick={unlockBio} disabled={busy}>Unlock with {label}</button>}
+      {bio && !bioReady && <p className="muted">For security, enter your password every 14 days. {label} works again after this unlock.</p>}
     </form>
   );
 }

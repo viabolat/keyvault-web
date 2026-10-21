@@ -66,7 +66,7 @@ export function normalizeSecretKey(input: string): string {
   return [SECRET_KEY_VERSION, ...parts].join('-');
 }
 
-async function hkdf(ikm: Bytes, salt: Bytes, info: string, length = 32): Promise<Bytes> {
+export async function hkdf(ikm: Bytes, salt: Bytes, info: string, length = 32): Promise<Bytes> {
   const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits(
     { name: 'HKDF', hash: 'SHA-256', salt, info: enc.encode(info) },

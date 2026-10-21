@@ -98,6 +98,7 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--border); borde
 .menu button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; text-align: left; }
 .menu button:hover { background: var(--surface-2); }
 .menu kbd { margin-left: auto; }
+.menu-note { margin: 4px 10px 6px; font-size: 13px; }
 
 .sidebar { background: var(--surface-2); border-right: 1px solid var(--border); padding: 12px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
 .new-item { justify-content: center; margin: 0 4px 12px; }

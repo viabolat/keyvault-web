@@ -2,6 +2,18 @@
 
 Why the non-obvious decisions were made. Newest first.
 
+## Face ID unlock (src/crypto/biometric.ts)
+- **WebAuthn passkey + PRF extension, not a stored password.** The PRF output only exists after Face ID passes, so the
+  account key wrapped with it is useless to someone who copies localStorage. Built into Safari: no service, no fee.
+- **Wraps the account key, not the AUK.** Unlocking skips the password and Secret Key entirely; the record is per device
+  and never synced (it lives outside `StoredAccount`).
+- **Password required every 14 days**, and on every public/shared sign-in the record is deleted. This limits how long a
+  stolen-but-unlocked phone stays one face away from the vault.
+- **Sync after Face ID reuses the persisted Supabase session.** There is no password to derive the login secret. If that
+  session is gone, sync pauses until the next password unlock, rather than failing the unlock.
+- **A failed unwrap deletes the record**, because a passkey removed from iCloud Keychain gives different PRF bytes forever.
+- **Trusted devices only**: the menu toggle is hidden when no Secret Key is stored on the device.
+
 ## Hosting (vercel.json, public/sw.js)
 - **CSP has no 'unsafe-inline' and no third-party origins.** A password manager's biggest web risk is injected script;
   React's `style={}` uses the CSSOM, which CSP does not block, so `style-src 'self'` holds. The favicon moved from a
